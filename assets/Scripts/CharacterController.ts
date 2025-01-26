@@ -1,52 +1,58 @@
-import { _decorator, Vec3, EventTouch, Component, Node, view } from 'cc';
+import { _decorator, Component, Node, Vec3, input, Input, EventTouch, macro, view, UITransform } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('CharacterController')
-export default class CharacterController extends Component {
-    
-    @property(Node)
-    character: Node = null;  // Assign the character node in the Inspector
+export class CharacterController extends Component {
+   @property
+   speed: number = 200; // Movement speed
 
-    private speed: number = 300;  // Speed in pixels per second
-    private moveDirection: number = 0;  // -1 left, 1 right, 0 stop
+   private direction: number = 0;
 
-    start() {
-        // Attach touch event listeners
-        this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
-        this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
-        this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
-    }
+   start() {
+       input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
+       input.on(Input.EventType.TOUCH_END, this.onTouchEnd, this);
+       
+       // Listen for window resize
+       view.on('canvas-resize', this.onResize, this);
+   }
 
-    private onTouchStart(event: EventTouch) {
-        console.log("Screen touched at:", event.getLocation());
-        let touchPos = event.getLocation();
-        let screenWidth = view.getVisibleSize().width;
+   update(deltaTime: number) {
+       if (this.direction !== 0) {
+           let pos = this.node.position.clone();
+           let newPosX = pos.x + this.direction * this.speed * deltaTime;
+           
+           const screenWidth = view.getVisibleSize().width;
+           const halfWidth = this.node.getComponent(UITransform).contentSize.width / 2;
 
-        if (touchPos.x < screenWidth / 2) {
-            console.log("Moving left");
-            this.moveDirection = -1;  // Move left
-        } else {
-            console.log("Moving right");
-            this.moveDirection = 1;   // Move right
-        }
-    }
+           // Ensure the character stays within screen boundaries
+           newPosX = Math.max(-screenWidth / 2 + halfWidth, Math.min(screenWidth / 2 - halfWidth, newPosX));
 
-    private onTouchEnd(event: EventTouch) {
-        console.log("Touch ended");
-        this.moveDirection = 0;  // Stop movement
-    }
+           this.node.setPosition(new Vec3(newPosX, pos.y, pos.z));
+       }
+   }
 
-    update(dt: number) {
-        console.log("Updating...");
+   onResize() {
+       const screenWidth = view.getVisibleSize().width;
+       const halfWidth = this.node.getComponent(UITransform).contentSize.width / 2;
 
-        if (this.character && this.moveDirection !== 0) {
-            let currentPos = this.character.getPosition();
-            let newX = currentPos.x + this.moveDirection * this.speed * dt;
+       // Ensure the character stays within bounds after resize
+       let pos = this.node.position.clone();
+       pos.x = Math.max(-screenWidth / 2 + halfWidth, Math.min(screenWidth / 2 - halfWidth, pos.x));
+       this.node.setPosition(pos);
+   }
 
-            let halfScreenWidth = view.getVisibleSize().width / 2;
-            newX = Math.max(-halfScreenWidth, Math.min(halfScreenWidth, newX));
+   onTouchStart(event: EventTouch) {
+       let touchLocation = event.getUILocation();
+       
+       const screenWidth = view.getVisibleSize().width;
+       if (touchLocation.x < screenWidth / 2) {
+           this.direction = -1;
+       } else {
+           this.direction = 1;
+       }
+   }
 
-            this.character.setPosition(new Vec3(newX, currentPos.y, currentPos.z));
-        }
-    }
+   onTouchEnd(event: EventTouch) {
+       this.direction = 0;
+   }
 }
